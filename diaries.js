@@ -116,6 +116,45 @@
         document.body.appendChild(a); a.click();
         setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       };
+
+      // 自动本地写入版本（你需求：点击保存直接生成/覆盖 diaries/YYYY-MM-DD.txt）
+      // 使用 File System Access API，首次保存会弹目录选择器；取消则回退到下载方式。
+      (function(){
+        if(!('showDirectoryPicker' in window)) return; // 不支持则仅下载
+        let dirHandle = null;
+        async function ensureDir(){
+          if(dirHandle) return true;
+          try {
+            dirHandle = await window.showDirectoryPicker({id:'diaries-dir'});
+            return true;
+          } catch(e){
+            console.warn('目录选择取消或失败, 使用下载回退', e);
+            return false;
+          }
+        }
+        async function writeFile(dateStr, content){
+          const ok = await ensureDir();
+            if(!ok){ // fallback
+              if(global.__downloadDiaryTxt) global.__downloadDiaryTxt(dateStr, content);
+              return;
+            }
+          try {
+            if(!content.trim()){
+              // 空内容：尝试删除文件；若失败忽略。
+              try { await dirHandle.removeEntry(dateStr+'.txt'); } catch(_){}
+              return;
+            }
+            const fh = await dirHandle.getFileHandle(dateStr+'.txt', {create:true});
+            const w = await fh.createWritable();
+            await w.write(content.replace(/\r?\n/g,'\n')+'\n');
+            await w.close();
+          } catch(err){
+            console.warn('写入失败，回退为下载', err);
+            if(global.__downloadDiaryTxt) global.__downloadDiaryTxt(dateStr, content);
+          }
+        }
+        global.FileDiaryAutoWriter = { save: writeFile };
+      })();
     });
   }
 
