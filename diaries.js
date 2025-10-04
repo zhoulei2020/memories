@@ -117,43 +117,87 @@
         setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       };
 
-      // 自动本地写入版本（你需求：点击保存直接生成/覆盖 diaries/YYYY-MM-DD.txt）
-      // 使用 File System Access API，首次保存会弹目录选择器；取消则回退到下载方式。
+      // 自动本地写入版本改进：提供绑定按钮+状态提示；优先写入 diaries/ 子目录
       (function(){
-        if(!('showDirectoryPicker' in window)) return; // 不支持则仅下载
-        let dirHandle = null;
-        async function ensureDir(){
-          if(dirHandle) return true;
+        if(!('showDirectoryPicker' in window)){
+          console.info('[diaries] 浏览器不支持 showDirectoryPicker，使用下载方式。');
+          return;
+        }
+        let diariesDirHandle = null; // 指向真正的 diaries 目录
+        let rootPicked = false;
+
+        // UI 元素
+        const bindBtn = document.createElement('button');
+        bindBtn.textContent='绑定 diaries 目录';
+        bindBtn.style.cssText='position:fixed;bottom:8px;left:8px;z-index:9999;background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.25)';
+        const statusTag = document.createElement('span');
+        statusTag.style.cssText='position:fixed;bottom:44px;left:12px;z-index:9999;font-size:11px;color:#888;background:rgba(0,0,0,.4);padding:2px 6px;border-radius:4px;backdrop-filter:blur(4px);';
+        statusTag.textContent='未绑定';
+        document.body.appendChild(bindBtn);
+        document.body.appendChild(statusTag);
+
+        function toast(msg, ok){
+          let t=document.createElement('div');
+          t.textContent=msg;
+          t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:'+(ok?'#16a34a':'#dc2626')+';color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;z-index:10000;box-shadow:0 2px 6px rgba(0,0,0,.35);';
+          document.body.appendChild(t); setTimeout(()=>{t.style.opacity='0'; t.style.transition='opacity .4s';},20); setTimeout(()=>t.remove(),1800);
+        }
+
+        async function pick(){
           try {
-            dirHandle = await window.showDirectoryPicker({id:'diaries-dir'});
-            return true;
+            const handle = await window.showDirectoryPicker({id:'memories-root-or-diaries'});
+            rootPicked=true;
+            // 尝试进入 diaries 子目录，如果该目录本身已经是 diaries，进入失败就保持当前
+            try {
+              const sub = await handle.getDirectoryHandle('diaries');
+              diariesDirHandle = sub; // 用户选的是仓库根
+            } catch(_){
+              // 没有 diaries 子目录，可能用户直接选的 diaries 目录，检测一个典型 txt 是否存在
+              diariesDirHandle = handle;
+            }
+            statusTag.textContent='已绑定';
+            statusTag.style.color='#16a34a';
+            toast('已绑定目录', true);
           } catch(e){
-            console.warn('目录选择取消或失败, 使用下载回退', e);
-            return false;
+            console.warn('目录选择被取消', e);
+            toast('未绑定，使用自动下载', false);
           }
         }
+
+        bindBtn.addEventListener('click', pick);
+
+        async function ensureDiaries(){
+          if(diariesDirHandle) return true;
+          await pick();
+          return !!diariesDirHandle;
+        }
+
         async function writeFile(dateStr, content){
-          const ok = await ensureDir();
-            if(!ok){ // fallback
-              if(global.__downloadDiaryTxt) global.__downloadDiaryTxt(dateStr, content);
-              return;
-            }
+          const ok = await ensureDiaries();
+          if(!ok){
+            if(global.__downloadDiaryTxt) global.__downloadDiaryTxt(dateStr, content);
+            return;
+          }
           try {
             if(!content.trim()){
-              // 空内容：尝试删除文件；若失败忽略。
-              try { await dirHandle.removeEntry(dateStr+'.txt'); } catch(_){}
+              try { await diariesDirHandle.removeEntry(dateStr+'.txt'); toast('已删除 '+dateStr+'.txt', true);} catch(_){ toast('本地无此文件', false); }
               return;
             }
-            const fh = await dirHandle.getFileHandle(dateStr+'.txt', {create:true});
+            const fh = await diariesDirHandle.getFileHandle(dateStr+'.txt',{create:true});
             const w = await fh.createWritable();
             await w.write(content.replace(/\r?\n/g,'\n')+'\n');
             await w.close();
+            toast('写入成功 '+dateStr+'.txt', true);
+            // 立即更新内存集合，便于当月提示点刷新（若页面重新渲染）
+            try { FILE_DIARY_DATES.add(dateStr); } catch(_){}
+            document.dispatchEvent(new CustomEvent('diary-file-written',{detail:{date:dateStr}}));
           } catch(err){
-            console.warn('写入失败，回退为下载', err);
+            console.warn('写入失败，回退下载', err);
+            toast('写入失败，改为下载', false);
             if(global.__downloadDiaryTxt) global.__downloadDiaryTxt(dateStr, content);
           }
         }
-        global.FileDiaryAutoWriter = { save: writeFile };
+        global.FileDiaryAutoWriter = { save: writeFile, rebind: pick };
       })();
     });
   }
