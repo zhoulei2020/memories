@@ -141,10 +141,10 @@
   saveBtn.addEventListener('click',()=>{ 
     if(!CAN_EDIT) return; if(!activeDateStr) return; 
     const val = diaryText.value.trim();
-    DiaryStore.save(activeDateStr,val); 
-    // 若绑定了目录则写入对应 txt
-    if(window.FileDiarySync && typeof window.FileDiarySync.onSave==='function'){
-      window.FileDiarySync.onSave(activeDateStr,val);
+    DiaryStore.save(activeDateStr,val);
+    // 自动下载该日期 txt，手动放入 diaries/ 并提交即可上线。
+    if(typeof window.__downloadDiaryTxt==='function'){
+      window.__downloadDiaryTxt(activeDateStr,val);
     }
     closeDiary(); render(); 
   });
@@ -152,8 +152,8 @@
     if(!CAN_EDIT) return; if(!activeDateStr) return; 
     if(confirm('确定删除该日记?')){
       DiaryStore.save(activeDateStr,''); 
-      if(window.FileDiarySync && typeof window.FileDiarySync.onSave==='function'){
-        window.FileDiarySync.onSave(activeDateStr,'');
+      if(typeof window.__downloadDiaryTxt==='function'){
+        // 删除时可以选择是否生成空文件，这里不下载；若需要可改成下载空内容。
       }
       closeDiary(); render();
     }
