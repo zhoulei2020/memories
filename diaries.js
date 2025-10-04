@@ -104,6 +104,133 @@
       btn.title='生成并下载包含所有公共+本地修改的 diaries.js 文件';
       btn.onclick=downloadMergedFile;
       document.body.appendChild(btn);
+
+      // ===== 本地文件同步增强 =====
+      // 需求: 编辑某日期后希望对应 diaries/YYYY-MM-DD.txt 也被更新。
+      // 纯静态站点无法直接写 git 仓库文件，这里利用浏览器 File System Access API (Chrome / Edge / 新版 Edge / 99% 桌面 Chromium)。
+      // 原理: 让你手动选择 diaries 目录 -> 授权读写 -> 保存时写入 YYYY-MM-DD.txt，并维护 manifest.json。
+      // 若浏览器/权限不支持，提供“下载当前TXT”按钮手动替换。
+      const modalActions = document.querySelector('.modal-actions');
+      if(modalActions){
+        const syncWrap = document.createElement('div');
+        syncWrap.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;font-size:12px;align-items:center';
+
+        const pickBtn = document.createElement('button');
+        pickBtn.textContent='绑定目录自动写入TXT';
+        pickBtn.type='button';
+        pickBtn.style.cssText='background:#2563eb;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;';
+
+        const dlBtn = document.createElement('button');
+        dlBtn.textContent='下载当前TXT';
+        dlBtn.type='button';
+        dlBtn.style.cssText='background:#64748b;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;';
+
+        const statusSpan = document.createElement('span');
+        statusSpan.id='file-sync-status';
+        statusSpan.style.cssText='color:#888;margin-left:4px;min-width:120px;';
+        statusSpan.textContent='未绑定';
+
+        syncWrap.append(pickBtn, dlBtn, statusSpan);
+        modalActions.parentNode.appendChild(syncWrap);
+
+        let diaryDirHandle = null; // 仅会话内缓存
+
+        async function pickDiaryDir(){
+          if(!window.showDirectoryPicker){
+            alert('当前浏览器不支持目录授权 (需要 Chromium 内核)。请使用“下载当前TXT”方式。');
+            return;
+          }
+            try {
+              const handle = await window.showDirectoryPicker();
+              // 简单校验: 至少包含 manifest.json 或允许创建
+              diaryDirHandle = handle;
+              statusSpan.textContent='已绑定';
+              statusSpan.style.color='#16a34a';
+            } catch(e){
+              console.warn(e);
+            }
+        }
+
+        async function ensureManifestArray(){
+          if(!diaryDirHandle) return null;
+          try {
+            const mh = await diaryDirHandle.getFileHandle('manifest.json',{create:true});
+            const f = await mh.getFile();
+            const txt = await f.text();
+            let arr=[]; if(txt.trim()) { try{ arr=JSON.parse(txt);}catch(e){ arr=[]; } }
+            if(!Array.isArray(arr)) arr=[];
+            return {mh,arr};
+          } catch(e){
+            console.warn('读取 manifest 失败',e); return null;
+          }
+        }
+
+        async function writeManifest(mh, arr){
+          try {
+            const w = await mh.createWritable();
+            arr.sort();
+            await w.write(JSON.stringify(arr, null, 2));
+            await w.close();
+          } catch(e){ console.warn('写入 manifest 失败',e); }
+        }
+
+        async function writeTxt(dateStr, content){
+          if(!diaryDirHandle) return false;
+          try {
+            if(!content.trim()){
+              // 空内容 => 试图删除文件（若存在）并从 manifest 移除
+              try { await diaryDirHandle.removeEntry(dateStr+'.txt'); } catch(_){/*忽略*/}
+              const ctx = await ensureManifestArray();
+              if(ctx){
+                const {mh,arr}=ctx;
+                const idx=arr.indexOf(dateStr); if(idx>=0){ arr.splice(idx,1); await writeManifest(mh,arr); }
+              }
+              return true;
+            }
+            const fh = await diaryDirHandle.getFileHandle(dateStr+'.txt',{create:true});
+            const w = await fh.createWritable();
+            await w.write(content.replace(/\r?\n/g,'\n') + '\n');
+            await w.close();
+            const ctx = await ensureManifestArray();
+            if(ctx){
+              const {mh,arr}=ctx;
+              if(!arr.includes(dateStr)){ arr.push(dateStr); await writeManifest(mh,arr); }
+            }
+            statusSpan.textContent='已同步 '+dateStr;
+            statusSpan.style.color='#16a34a';
+            return true;
+          } catch(e){
+            console.warn('写入失败',e);
+            statusSpan.textContent='写入失败';
+            statusSpan.style.color='#dc2626';
+            return false;
+          }
+        }
+
+        // 暴露给外部 (calendar.js 的保存逻辑调用)
+        global.FileDiarySync = {
+          async onSave(dateStr, content){
+            if(!diaryDirHandle){ return; }
+            await writeTxt(dateStr, content);
+          },
+          bound: ()=> !!diaryDirHandle
+        };
+
+        pickBtn.addEventListener('click', pickDiaryDir);
+        dlBtn.addEventListener('click', ()=>{
+          // 从当前输入框取值
+          const textarea = document.getElementById('diary-text');
+          const dateHdr = document.getElementById('modal-date');
+          if(!textarea || !dateHdr){ return; }
+          const dateStr = (dateHdr.textContent||'').split(' ')[0];
+          const blob = new Blob([textarea.value||'' ], {type:'text/plain;charset=utf-8'});
+          const a=document.createElement('a');
+          a.download = dateStr+'.txt';
+          a.href = URL.createObjectURL(blob);
+          document.body.appendChild(a); a.click();
+          setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        });
+      }
     });
   }
 

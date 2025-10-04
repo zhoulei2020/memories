@@ -138,8 +138,26 @@
   function closeDiary(){modal.classList.add('hidden');activeDateStr=null;}
   closeBtn.addEventListener('click',closeDiary);
   modal.addEventListener('click',e=>{if(e.target===modal) closeDiary();});
-  saveBtn.addEventListener('click',()=>{ if(!CAN_EDIT) return; if(!activeDateStr) return; DiaryStore.save(activeDateStr,diaryText.value.trim()); closeDiary(); render(); });
-  delBtn.addEventListener('click',()=>{ if(!CAN_EDIT) return; if(!activeDateStr) return; if(confirm('确定删除该日记?')){DiaryStore.save(activeDateStr,''); closeDiary(); render();}});
+  saveBtn.addEventListener('click',()=>{ 
+    if(!CAN_EDIT) return; if(!activeDateStr) return; 
+    const val = diaryText.value.trim();
+    DiaryStore.save(activeDateStr,val); 
+    // 若绑定了目录则写入对应 txt
+    if(window.FileDiarySync && typeof window.FileDiarySync.onSave==='function'){
+      window.FileDiarySync.onSave(activeDateStr,val);
+    }
+    closeDiary(); render(); 
+  });
+  delBtn.addEventListener('click',()=>{ 
+    if(!CAN_EDIT) return; if(!activeDateStr) return; 
+    if(confirm('确定删除该日记?')){
+      DiaryStore.save(activeDateStr,''); 
+      if(window.FileDiarySync && typeof window.FileDiarySync.onSave==='function'){
+        window.FileDiarySync.onSave(activeDateStr,'');
+      }
+      closeDiary(); render();
+    }
+  });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !modal.classList.contains('hidden')) closeDiary(); });
 
   render();
