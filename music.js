@@ -43,6 +43,11 @@
   let audio = new Audio();
   audio.preload = 'auto';
   audio.crossOrigin = 'anonymous';
+  // 默认音量降低，若本地曾调节过则读取上次记忆
+  try {
+    const savedVol = localStorage.getItem('memories-volume');
+    audio.volume = savedVol ? Math.min(1, Math.max(0, parseFloat(savedVol))) : 0.28; // 默认 ~30%
+  } catch(e){ audio.volume = 0.28; }
   let index = 0;
   let isLoop = false;
   let userInteracted = false;
@@ -192,7 +197,12 @@
   els.next.addEventListener('click', ()=>{ userInteracted=true; next(); });
   els.prev.addEventListener('click', ()=>{ userInteracted=true; prev(); });
   els.loop.addEventListener('click', toggleLoop);
-  els.volume.addEventListener('input', e=>{ audio.volume = parseFloat(e.target.value); });
+  els.volume.addEventListener('input', e=>{ 
+    audio.volume = parseFloat(e.target.value);
+    try { localStorage.setItem('memories-volume', audio.volume.toFixed(2)); } catch(_){}
+  });
+  // 初始化滑块位置（若存在）
+  if(els.volume && typeof audio.volume==='number'){ els.volume.value = audio.volume.toString(); }
   els.seek.addEventListener('input', e=> seekTo(parseFloat(e.target.value)) );
   if(els.showList) els.showList.addEventListener('click', ()=>{ userInteracted=true; togglePlaylist(); });
   if(els.fantasy) els.fantasy.addEventListener('click', ()=>{ userInteracted=true; toggleFantasy(); });

@@ -44,6 +44,44 @@
     return json;
   }
 
+  // 本地一键下载合并后的 diaries.js，方便直接覆盖仓库文件再提交
+  function downloadMergedFile(){
+    const mergedJSON = exportLocal();
+    const fileContent = `// diaries.js - 公共只读日记数据 (自动生成)\n`+
+`(function(global){\n`+
+`  const PUBLIC_DIARIES = ${mergedJSON};\n\n`+
+`  const IS_LOCAL = ['localhost','127.0.0.1','::1'].includes(location.hostname) || location.origin.startsWith('file://');\n`+
+`  function hasEditPrivilege(){ return IS_LOCAL; }\n`+
+`  function getDiary(dateStr){\n`+
+`    try { const local = localStorage.getItem('memories-diary-'+dateStr); if(local) return local; } catch(e){}\n`+
+`    return PUBLIC_DIARIES[dateStr]||'';\n`+
+`  }\n`+
+`  function isPublicHas(dateStr){ return PUBLIC_DIARIES.hasOwnProperty(dateStr); }\n`+
+`  function exportLocal(){ return JSON.stringify(PUBLIC_DIARIES,null,2); }\n`+
+`  global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege};\n`+
+`  global.__exportLocalDiaries = exportLocal;\n`+
+`})(window);\n`;
+    const blob = new Blob([fileContent], {type:'application/javascript;charset=utf-8'});
+    const a=document.createElement('a');
+    a.download='diaries.js';
+    a.href=URL.createObjectURL(blob);
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+
+  // 若本地开发，插入导出按钮
+  if(['localhost','127.0.0.1','::1'].includes(location.hostname) || location.origin.startsWith('file://')){
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const btn=document.createElement('button');
+      btn.textContent='导出日记文件';
+      btn.style.cssText='position:fixed;bottom:8px;right:8px;z-index:9999;background:#ec4899;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.2)';
+      btn.title='生成并下载包含所有公共+本地修改的 diaries.js 文件';
+      btn.onclick=downloadMergedFile;
+      document.body.appendChild(btn);
+    });
+  }
+
   global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege};
   global.__exportLocalDiaries = exportLocal;
 })(window);
