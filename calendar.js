@@ -142,11 +142,8 @@
     if(!CAN_EDIT) return; if(!activeDateStr) return; 
     const val = diaryText.value.trim();
     DiaryStore.save(activeDateStr,val);
-    // 尝试直接写入本地 diaries 目录；失败则自动下载
-    if(window.FileDiaryAutoWriter && typeof window.FileDiaryAutoWriter.save==='function'){
-      window.FileDiaryAutoWriter.save(activeDateStr,val);
-    } else if(typeof window.__downloadDiaryTxt==='function'){
-      window.__downloadDiaryTxt(activeDateStr,val);
+    if(window.PublicDiary && typeof window.PublicDiary.saveDiary==='function'){
+      window.PublicDiary.saveDiary(activeDateStr,val);
     }
     closeDiary(); render(); 
   });
