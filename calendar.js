@@ -4,6 +4,10 @@
   let current=new Date();
   current.setDate(1);
   const CAN_EDIT = PublicDiary.hasEditPrivilege();
+  // 异步加载文件型日记清单，完成后若已渲染再补一次渲染以显示指示点
+  if(PublicDiary.loadDiaryManifest){
+    PublicDiary.loadDiaryManifest().then(()=>{ try { render(); } catch(e){} });
+  }
 
   function buildHeader(){
     const h=document.createElement('div');h.className='calendar-header';
@@ -40,9 +44,12 @@
       const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const dayDiv=document.createElement('div');dayDiv.className='day';
       if(now.getFullYear()===y && now.getMonth()===m && now.getDate()===d) dayDiv.classList.add('today');
-      // 如果该日期已有任意来源日记内容则加提示点
+      // 如果该日期已有任意来源（日记对象 / 本地 / 文件）日记内容则加提示点
       try {
-        if((DiaryStore.load(dateStr)||'').trim() || PublicDiary.getDiary(dateStr).trim()) dayDiv.classList.add('has-note');
+        const hasLocal = (DiaryStore.load(dateStr)||'').trim();
+        const hasStatic = PublicDiary.getDiary(dateStr).trim();
+        const hasFile = PublicDiary.hasFileDiary ? PublicDiary.hasFileDiary(dateStr) : false;
+        if(hasLocal || hasStatic || hasFile) dayDiv.classList.add('has-note');
       } catch(e){}
       const g=document.createElement('div');g.className='g';g.textContent=d;
       const label = LunarCalendar.composeLunarLabel(date);
@@ -56,7 +63,15 @@
         const b=document.createElement('div');b.className='badge holiday';b.textContent=label;dayDiv.appendChild(b);
       }
       dayDiv.append(g,lunarDiv);
-      dayDiv.addEventListener('click',()=>openDiary(date,dateStr,label));
+      dayDiv.addEventListener('click',()=>{
+        if(!CAN_EDIT){
+          const hasLocal = (DiaryStore.load(dateStr)||'').trim();
+          const hasStatic = PublicDiary.getDiary(dateStr).trim();
+          const hasFile = PublicDiary.hasFileDiary ? PublicDiary.hasFileDiary(dateStr) : false;
+            if(!(hasLocal || hasStatic || hasFile)) return; // 无内容则不弹窗
+        }
+        openDiary(date,dateStr,label);
+      });
       grid.appendChild(dayDiv);
     }
     container.appendChild(grid);

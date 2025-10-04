@@ -24,6 +24,13 @@ jobs:
         run: |
           mkdir build
           cp -R index.html assets backgrounds.js calendar.js diaries.js lunar.js music.js storage.js styles.css sw.js build/
+          # Copy diaries directory (per-date text entries)
+          if [ -d diaries ]; then
+            mkdir -p build/diaries
+            cp -R diaries/*.txt build/diaries/ 2>/dev/null || true
+            # Generate manifest.json listing available diary dates
+            ls diaries/*.txt 2>/dev/null | sed 's#diaries/##' | sed 's#.txt##' | jq -R -s 'split("\n")|map(select(length>0))' > build/diaries/manifest.json || echo '[]' > build/diaries/manifest.json
+          fi
           # Include client React source only if you later want to publish it too
           # cp -R client build/client
           touch build/.nojekyll

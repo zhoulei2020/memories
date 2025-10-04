@@ -31,6 +31,17 @@
   // 尝试从静态文件 (diaries/YYYY-MM-DD.txt) 读取公开日记（异步）。
   // 返回 Promise<string>，找不到时 resolve ''，并缓存结果避免重复请求。
   const __fileCache = {};
+  const FILE_DIARY_DATES = new Set();
+  let manifestPromise = null;
+  function loadDiaryManifest(){
+    if(manifestPromise) return manifestPromise;
+    manifestPromise = fetch('diaries/manifest.json',{cache:'no-cache'})
+      .then(r=> r.ok ? r.json() : [])
+      .then(arr=>{ if(Array.isArray(arr)) arr.forEach(d=>FILE_DIARY_DATES.add(d)); return FILE_DIARY_DATES; })
+      .catch(()=>FILE_DIARY_DATES);
+    return manifestPromise;
+  }
+  function hasFileDiary(dateStr){ return FILE_DIARY_DATES.has(dateStr); }
   function fetchDiaryFile(dateStr){
     if(__fileCache[dateStr] !== undefined){
       return Promise.resolve(__fileCache[dateStr]);
@@ -96,6 +107,6 @@
     });
   }
 
-  global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege,fetchDiaryFile};
+  global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege,fetchDiaryFile,loadDiaryManifest,hasFileDiary};
   global.__exportLocalDiaries = exportLocal;
 })(window);
