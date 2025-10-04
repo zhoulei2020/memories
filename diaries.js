@@ -28,6 +28,20 @@
     return PUBLIC_DIARIES[dateStr]||'';
   }
 
+  // 尝试从静态文件 (diaries/YYYY-MM-DD.txt) 读取公开日记（异步）。
+  // 返回 Promise<string>，找不到时 resolve ''，并缓存结果避免重复请求。
+  const __fileCache = {};
+  function fetchDiaryFile(dateStr){
+    if(__fileCache[dateStr] !== undefined){
+      return Promise.resolve(__fileCache[dateStr]);
+    }
+    const url = `diaries/${dateStr}.txt`;
+    return fetch(url,{cache:'no-cache'})
+      .then(r=>{ if(!r.ok) return ''; return r.text(); })
+      .then(text=>{ const t = text.trim(); if(t) __fileCache[dateStr]=t; else __fileCache[dateStr]=''; return __fileCache[dateStr]; })
+      .catch(()=>{ __fileCache[dateStr]=''; return ''; });
+  }
+
   function isPublicHas(dateStr){ return PUBLIC_DIARIES.hasOwnProperty(dateStr); }
 
   function exportLocal(){
@@ -82,6 +96,6 @@
     });
   }
 
-  global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege};
+  global.PublicDiary = {getDiary,isPublicHas,hasEditPrivilege,fetchDiaryFile};
   global.__exportLocalDiaries = exportLocal;
 })(window);

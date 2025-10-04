@@ -89,7 +89,21 @@
     activeDateStr=dateStr;
     modalDate.textContent=dateStr + (CAN_EDIT? ' (编辑模式)' : '');
     modalLunar.textContent=`农历：${label}`;
-    diaryText.value= (DiaryStore.load(dateStr) || PublicDiary.getDiary(dateStr) || '');
+    let initial = (DiaryStore.load(dateStr) || PublicDiary.getDiary(dateStr) || '');
+    diaryText.value = initial;
+    // 若本地无 & 静态对象无，尝试异步加载文件
+    if(!initial.trim() && PublicDiary.fetchDiaryFile){
+      diaryText.value='(加载中...)';
+      PublicDiary.fetchDiaryFile(dateStr).then(txt=>{
+        if(activeDateStr!==dateStr) return; // 用户可能已关闭
+        if(!CAN_EDIT){
+          diaryText.value = txt || '';
+        } else {
+          // 编辑模式下不覆盖用户可能已经开始输入的内容
+          if(diaryText.value==='(加载中...)') diaryText.value = txt || '';
+        }
+      });
+    }
     if(CAN_EDIT){
       diaryText.removeAttribute('disabled');
       saveBtn.style.display='';
