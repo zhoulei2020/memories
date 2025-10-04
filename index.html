@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>四季记忆日历</title>
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="description" content="一个带有农历与节气、可记录日记的四季背景万年历" />
+</head>
+<body>
+  <div id="background-layer"></div>
+  <canvas id="season-canvas"></canvas>
+  <header class="site-header">
+    <h1>四季记忆</h1>
+  </header>
+
+  <div id="calendar-container" class="calendar-wrapper"></div>
+
+  <div id="diary-modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="close-btn" id="close-modal">×</button>
+      <h2 id="modal-date"></h2>
+      <small id="modal-lunar"></small>
+      <textarea id="diary-text" placeholder="写下今天的点滴... (仅保存在你的浏览器)" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button id="save-diary" class="primary">保存</button>
+        <button id="delete-diary" class="danger">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="visit-counter">
+      访问量: <span id="busuanzi_value_site_pv">--</span> ｜ 访客数: <span id="busuanzi_value_site_uv">--</span>
+    </div>
+    <div class="note">日记仅保存在本地浏览器 • 节气/农历为近似算法 • 背景会随季节 / 节日变换</div>
+  </footer>
+
+  <!-- 背景音乐播放器（可自定义播放列表） -->
+  <div id="music-player" class="music-player hidden">
+    <button class="mp-btn mp-toggle" id="mp-toggle" aria-label="播放/暂停">▶</button>
+    <div class="mp-meta">
+      <div class="mp-title" id="mp-title">Background Music</div>
+      <div class="mp-progress">
+        <input type="range" id="mp-seek" min="0" max="100" value="0" aria-label="进度" />
+      </div>
+    </div>
+    <div class="mp-controls">
+      <button class="mp-btn" id="mp-prev" aria-label="上一首">⏮</button>
+      <button class="mp-btn" id="mp-next" aria-label="下一首">⏭</button>
+      <button class="mp-btn" id="mp-loop" aria-label="循环">∞</button>
+      <input type="range" id="mp-volume" min="0" max="1" step="0.01" value="0.7" aria-label="音量" />
+    </div>
+    <div class="mp-extra">
+      <div class="mp-toolbar">
+        <button class="mp-btn" id="mp-show-list" aria-label="显示/隐藏播放列表">列表</button>
+        <button class="mp-btn" id="mp-fantasy" aria-label="奇幻模式开关">奇幻模式:关</button>
+      </div>
+      <div class="mp-playlist hidden" id="mp-playlist" aria-label="播放列表" tabindex="0"></div>
+    </div>
+    <button class="mp-btn mp-close" id="mp-close" aria-label="关闭播放器">×</button>
+  </div>
+
+  <button id="music-mini-launch" class="music-launch" aria-label="打开音乐播放器">♫</button>
+
+  <!-- 脚本顺序：工具 → 农历/节气 → 背景 → 日历主体 -->
+  <script src="lunar.js"></script>
+  <script src="backgrounds.js"></script>
+  <script src="storage.js"></script>
+  <script src="diaries.js"></script>
+  <script src="music.js"></script>
+  <script src="calendar.js"></script>
+  <script>
+    // 注册 Service Worker (需页面在同源根或正确 scope 下访问)。在 Gitee Pages 通常放根目录即可。
+    if('serviceWorker' in navigator){
+      window.addEventListener('load',()=>{
+        navigator.serviceWorker.register('sw.js').catch(console.error);
+      });
+    }
+  </script>
+  <!-- 不蒜子统计（纯前端 PV/UV） -->
+  <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</body>
+</html>
